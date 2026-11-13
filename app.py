@@ -12,7 +12,8 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
-BOT_TOKEN = "9080932798:AAFtYGGZOaG0E6Jxo_FmRx2qHuJ9_kMfNaI"
+# Token ab seedhe Render Environment Variables se aayega (100% Safe)
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "").strip()
 RENDER_URL = os.environ.get("RENDER_EXTERNAL_URL", "").strip().rstrip("/")
 
 DB_FILE = "keys_db.json"
@@ -24,6 +25,8 @@ def get_bot_username():
     global CACHED_USERNAME
     if CACHED_USERNAME:
         return CACHED_USERNAME
+    if not BOT_TOKEN:
+        return ""
     try:
         res = requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/getMe", timeout=8).json()
         if res.get("ok"):
@@ -104,7 +107,7 @@ def home():
 def claim_redirect():
     bot_user = get_bot_username()
     if not bot_user:
-        return "Bot username fetch nahi ho paya, page refresh karein.", 500
+        return "Bot token check karein ya page refresh karein.", 500
 
     token = gen_token(12)
     with db_lock:
@@ -203,7 +206,6 @@ def verify_key():
         if not info:
             return jsonify({"status": False, "reason": "Invalid Key! Sahi key dalein."})
 
-        # Pehli baar unlock par 24 ghante ka timer shuru
         if info["device_id"] is None:
             info["device_id"] = device_id
             info["activated_at"] = now
@@ -212,11 +214,9 @@ def verify_key():
             save_db(db)
             return jsonify({"status": True})
 
-        # Dusre phone me block
         if info["device_id"] != device_id:
             return jsonify({"status": False, "reason": "Yeh Key kisi aur device mein use ho chuki hai!"})
 
-        # 24 ghante poore hone par key delete -> user ko nayi key leni padegi
         if now > info["expires_at"]:
             del db["keys"][key]
             save_db(db)
